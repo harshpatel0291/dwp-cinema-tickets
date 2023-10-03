@@ -1,0 +1,44 @@
+useDotenv: true
+
+app: cinema-tickets-api
+service: cinema-tickets-api
+frameworkVersion: '3'
+
+plugins:
+  - serverless-dotenv-plugin
+  - serverless-offline
+
+provider:
+  name: aws
+  versionFunctions: false
+  runtime: nodejs18.x
+  region: eu-west-2
+  timeout: 3
+  tracing:
+    lambda: true
+  vpc:
+    securityGroupIds:
+      - ${env:SECURITY_GROUP_ID}
+    subnetIds:
+      - ${env:SUBNET_ID_1}
+      - ${env:SUBNET_ID_2}
+      - ${env:SUBNET_ID_3}
+  environment:
+    API_NAME: ${env:API_NAME}
+    API_MODE: ${env:API_MODE}
+    API_STAGE: ${env:API_STAGE}
+    API_VERSION: ${env:API_VERSION}
+    SECURITY_GROUP_ID: ${env:SECURITY_GROUP_ID}
+    SUBNET_ID_1: ${env:SUBNET_ID_1}
+    SUBNET_ID_2: ${env:SUBNET_ID_2}
+    SUBNET_ID_3: ${env:SUBNET_ID_3}
+
+package:
+  exclude:
+    - test/**
+
+functions: 
+  API:
+    handler: handler.handler
+    events:
+      - httpApi: '*'
