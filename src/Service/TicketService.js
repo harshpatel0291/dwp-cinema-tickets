@@ -11,6 +11,9 @@ const ticketPrices = {
   ADULT: 20,
 };
 
+// Define maximum tickets per purchase
+const maxTicketsPerPurchase = 20;
+
 /**
  * @namespace src/Service
  * @class TicketService
@@ -20,19 +23,11 @@ const ticketPrices = {
  */
 class TicketService {
   /**
-    * @public @method constructor
-    * @description Base method when instantiating class
-    */
-  constructor() {
-    this.maxTicketsPerPurchase = 20;
-  }
-
-  /**
     * @public @method purchaseTickets
     * @description Check if the purchase request is valid
     * @param {Number} accountId Account Id
     * @param {Array} data Ticket purchase request
-    * @return {Object} Reservation details
+    * @return {Object} Purchase details
     */
   purchaseTickets(accountId, data) {
     const ticketRequests = data.map((t) => new TicketRequest(t.type, t.quantity));
@@ -41,11 +36,11 @@ class TicketService {
     this._validatePurchaseRequest(ticketRequests);
 
     // Calculate the total price
-    const totalPrice = this._calculateTotalPrice(ticketRequests);
+    const totalCost = this._calculateTotalCost(ticketRequests);
 
     // Make a payment request to TicketPaymentService
     const ticketPaymentService = new TicketPaymentService();
-    ticketPaymentService.makePayment(accountId, totalPrice);
+    ticketPaymentService.makePayment(accountId, totalCost);
 
     // TODO: Throw an error if payment failed
 
@@ -60,7 +55,11 @@ class TicketService {
 
     // After events such as sending emails etc
 
-    return {reservationCode: Math.floor(Math.random() * 1000000000)};
+    return {
+      reference: Math.floor(Math.random() * 1000000000),
+      numSeatsToReserve,
+      totalCost
+    };
   }
 
   /**
@@ -71,51 +70,52 @@ class TicketService {
   _validatePurchaseRequest(ticketRequests) {
     for (const ticketRequest of ticketRequests) {
       const type = ticketRequest.getType();
+      const qyantity = ticketRequest.getQuantity();
 
-      // Check if infants are purchased with adults
+      // Check if child and infant are purchased with adults
       if (['Child', 'INFANT'].includes(type) && !ticketRequests.find((t) => t.getType() === 'ADULT')) {
         throw new InvalidPurchaseException('Child and Infant tickets must be purchased with adults');
+      }
+
+      // Check if infant quantity is not greater than adults
+      if (type === 'INFANT' && qyantity > ticketRequests.find((t) => t.getType() === 'ADULT').getQuantity()) {
+        throw new InvalidPurchaseException('Infant ticket quantity cannot be greater than adults');
       }
     }
 
     // Check if the total number of tickets is within the limit
     const totalNumOfTickets = ticketRequests.reduce((total, t) => total + t.getQuantity(), 0);
-    if (totalNumOfTickets > this.maxTicketsPerPurchase) {
-      throw new InvalidPurchaseException(`Only a maximum of ${this.maxTicketsPerPurchase} tickets can be purchased at a time`);
+    if (totalNumOfTickets > maxTicketsPerPurchase) {
+      throw new InvalidPurchaseException(`Only a maximum of ${maxTicketsPerPurchase} tickets can be purchased at a time`);
     }
   }
 
   /**
-    * @private @method _calculateTotalPrice
-    * @description Calculate total price for the ticket requests
+    * @private @method _calculateTotalCost
+    * @description Calculate total cost for the ticket requests
     * @param {Array} ticketRequests Different type of ticket requests
-    * @return {Number} Total price for the ticket requests
+    * @return {Number} Total cost for the ticket requests
     */
-  _calculateTotalPrice(ticketRequests) {
-    let totalPrice = 0;
-
-    for (const ticketRequest of ticketRequests) {
-      const type = ticketRequest.getType();
-      const quantity = ticketRequest.getQuantity();
-
-      const ticketPrice = ticketPrices[type];
-      totalPrice += ticketPrice * quantity; // TODO: is the price inc or ex vat?
-    }
-
-    return totalPrice;
+  _calculateTotalCost(ticketRequests) {
+    return ticketRequests.reduce((totalCost, request) => {
+      const ticketPrice = ticketPrices[request.getType()]; // TODO: is this price inc or ex vat?
+      return totalCost + ticketPrice * request.getQuantity();
+    }, 0);
   }
 
   /**
     * @private @method _calculateNumSeatsToReserve
-    * @description Calculate total number of seats to reserve
+    * @description Calculate the number of seats to reserve (excluding infants)
     * @param {Array} ticketRequests Different type of ticket requests
     * @return {Number} total number of seats to reserve
     */
   _calculateNumSeatsToReserve(ticketRequests) {
-    const numAdults = ticketRequests.find((tr) => tr.getType() === 'ADULT').getQuantity();
-    const numChildren = ticketRequests.find((tr) => tr.getType() === 'CHILD')?.getQuantity() || 0;
-
-    return numAdults + numChildren;
+    return ticketRequests.reduce((totalSeats, request) => {
+      if (request.getType() !== 'INFANT') {
+        return totalSeats + request.getQuantity();
+      }
+      return totalSeats;
+    }, 0);
   }
 }
 

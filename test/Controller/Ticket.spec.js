@@ -8,7 +8,7 @@ const request = require('supertest');
  * @author Harsh Patel
  * @license MIT
  */
-describe('Controller Endpoint Test [/Ticket]', () => {
+describe('Controller Endpoint Test [/ticket]', () => {
   describe('POST', () => {
     it('Should return 404, invalid route', (done) => {
       request(process.env.SERVER)
@@ -58,6 +58,21 @@ describe('Controller Endpoint Test [/Ticket]', () => {
     it('Should return 400, bad Request', (done) => {
       request(process.env.SERVER)
           .post('/ticket')
+          .send({accountId: 1, tickets: [{type: 'ADULT', quantity: 5}, {type: 'INFANT', quantity: 10}]})
+          .set({'Content-Type': 'application/json', 'Accept': 'application/json', 'Origin': process.env.ORIGIN})
+          .end(function(err, res) {
+            // check status with message
+            assert.strictEqual(res.statusCode, 400);
+            assert.strictEqual(res.body.message, 'Infant ticket quantity cannot be greater than adults');
+
+            // finish
+            setTimeout(() => done(), 50);
+          });
+    });
+
+    it('Should return 400, bad Request', (done) => {
+      request(process.env.SERVER)
+          .post('/ticket')
           .send({accountId: 1, tickets: [{type: 'ADULT', quantity: 10}, {type: 'CHILD', quantity: 10}, {type: 'INFANT', quantity: 1}]})
           .set({'Content-Type': 'application/json', 'Accept': 'application/json', 'Origin': process.env.ORIGIN})
           .end(function(err, res) {
@@ -70,7 +85,7 @@ describe('Controller Endpoint Test [/Ticket]', () => {
           });
     });
 
-    it('Should return 200, with reservationCode', (done) => {
+    it('Should return 200, with reference, number of seats to reserve and total cost', (done) => {
       request(process.env.SERVER)
           .post('/ticket')
           .send({accountId: 1, tickets: [{type: 'ADULT', quantity: 10}, {type: 'CHILD', quantity: 5}, {type: 'INFANT', quantity: 5}]})
@@ -78,8 +93,10 @@ describe('Controller Endpoint Test [/Ticket]', () => {
           .end(function(err, res) {
             // check status with message
             assert.strictEqual(res.statusCode, 200);
-            assert.ok(res.body.reservationCode);
-            assert.ok(typeof res.body.reservationCode === 'number');
+            assert.ok(res.body.reference);
+            assert.ok(typeof res.body.reference === 'number');
+            assert.strictEqual(res.body.numSeatsToReserve, 15);
+            assert.strictEqual(res.body.totalCost, 250);
 
             // finish
             setTimeout(() => done(), 50);
